@@ -1,0 +1,9 @@
+studyflow_data.json*
+*.xlsx
+*.zip
+*.ics
+messages*.html
+result.json
+*.7z
+__pycache__/
+

@@ -150,7 +150,6 @@ def load_data(path=DATA_FILE):
                          "При необходимости восстановите копию .json.bak. Причина: " + str(error)) from error
 
 def save_data(state, path=DATA_FILE):
-    # Сначала записываем временный файл целиком, затем атомарно заменяем основной.
     path = Path(path)
     temporary = path.with_suffix(".json.tmp")
     with temporary.open("w", encoding="utf-8") as file:
@@ -389,7 +388,6 @@ def is_deadline_message(text, settings):
 def find_deadline_date(text, message_date):
     text = normalize_text(text)
     base = source_datetime(message_date)
-    # Берём дату из строки с дедлайном, чтобы не спутать с датой занятия.
     marker = re.search(r"дедлайн|срок сдачи|принимается до|форма открыта до", text)
     search_text = text
     if marker:
@@ -443,7 +441,6 @@ def work_numbers(text):
 
 def infer_work(text):
     text = normalize_text(text)
-    # Заявка на проект и подготовка к ДЗ сами по себе не являются оценочными работами.
     if any(word in text for word in ["заявку", "подготовитель", "сформировать", "создайте", "заполните"]):
         return ""
     numbers = work_numbers(text)
@@ -512,7 +509,6 @@ def create_deadlines(message, subject, settings):
         if time_match:
             time = "%02d:%s" % (int(time_match.group(1)), time_match.group(2))
         numbers = work_numbers(block)
-        # «Подготовительный этап к домашним заданиям» не превращается в ДЗ.
         works = ["ДЗ " + str(n) for n in numbers] or [infer_work(block)]
         for work in works:
             if work:
@@ -576,7 +572,6 @@ def make_deadline_key(task):
 
 def choose_task_source(task):
     sources = task["sources"]
-    # Синхронизированная таблица имеет приоритет для даты над старым экспортом.
     sheets = [s for s in sources if s["kind"] == "sheet"]
     candidates = sheets or sources
     latest = max(enumerate(candidates), key=lambda pair: (source_datetime(pair[1]["date"]) or datetime.min, pair[0]))[1]
@@ -631,7 +626,6 @@ def merge_deadlines(old_tasks, new_tasks):
             if len(matches) == 1:
                 position = matches[0]
         if position is None and incoming["links"]:
-            # Для репоста проверяем только задачи того же предмета и дня.
             referenced = set()
             for link in incoming["links"]:
                 match = re.search(r"https://t\.me/c/\d+/(?:\d+/)?(\d+)$", link)
@@ -868,7 +862,6 @@ def repair_deadlines(state):
         state["repair_notice"] = "Объединено копий: %s, исключено обсуждений: %s, исправлено сроков: %s." % (
             len(candidates) - len(repaired), len(original) - len(candidates), corrected)
 
-# ------------------------------ XLSX ------------------------------
 XML_NS = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 
@@ -1097,8 +1090,7 @@ def grade_summary(state, subject):
         text += " Внимание: сумма весов %.4g, уточните формулу. Веса не нормализованы автоматически." % total_weight
     return text
 
-
-# -------------------------- Синхронизация --------------------------
+ 
 def spreadsheet_id(value):
     match = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]+)", value)
     identifier = value.strip()
@@ -1132,8 +1124,6 @@ def _import_spreadsheet(state, raw, kind, identity="local", synced=False):
         missing = previous - current
         if missing:
             warning.append("Из таблицы исчезли %s прежних записей, они сохранены в приложении." % len(missing))
-        # Дата сообщения нужна для контекста года. После извлечения используем
-        # момент импорта для выбора самой свежей версии источника.
         now = datetime.now(MSK).isoformat(timespec="seconds")
         for task in incoming:
             task["sources"][0]["date"] = now
@@ -1152,7 +1142,6 @@ def _import_spreadsheet(state, raw, kind, identity="local", synced=False):
         for subject, values in reported.items():
             changes["reported_grades"].setdefault(person, {}).setdefault(subject, {}).update(values)
         summary = "Оценки: прочитано %s, новых или изменённых %s." % (sum(len(w) for w in incoming.values()), changed)
-    # Обновляем только после полного разбора, ошибка не меняет прежние данные.
     state.update(changes)
     if synced:
         state["sync"][kind] = {"last_success": datetime.now(MSK).isoformat(timespec="seconds"),
@@ -1212,7 +1201,6 @@ def sync_sources(settings):
     return results
 
 
-# ---------------------------- iCalendar ----------------------------
 def ics_escape(text):
     return str(text).replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n").replace(";", "\\;").replace(",", "\\,")
 
@@ -1251,7 +1239,6 @@ def export_ics(tasks, path):
     Path(path).write_bytes(("\r\n".join(fold_ics_line(line) for line in lines) + "\r\n").encode("utf-8"))
 
 
-# ---------------------------- Интерфейс ----------------------------
 def keyboard_command(keysym, keycode, windows=False):
     key = keysym.lower()
     if windows and keycode in [65, 67, 86, 88]:
